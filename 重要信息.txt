@@ -1,0 +1,2 @@
+使用模型：Pro/Qwen/Qwen2.5-VL-7B-Instruct
+api key：sk-rvgkaxqeyvhulcciizkmavnexduidivmbhwgroohpjfeaegn

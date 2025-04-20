@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视障人士外出安全辅助</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .main-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      flex: 1;
+    }
+    .video-container {
+      flex: 1;
+      min-width: 300px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      background-color: #000;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #videoElement {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    #canvas {
+      display: none;
+    }
+    .chat-container {
+      flex: 1;
+      min-width: 300px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      min-height: 300px;
+      max-height: 500px;
+      font-size: 16px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .input-area {
+      display: flex;
+      gap: 10px;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    /* Style for the active button */
+    #controlButton.active {
+      background-color: #e74c3c; /* Red color */
+    }
+    #controlButton.active:hover {
+      background-color: #c0392b; /* Darker red on hover */
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 15px;
+    }
+    .status {
+      text-align: center;
+      margin: 10px 0;
+      font-style: italic;
+      color: #666;
+    }
+    .error {
+      color: #e74c3c;
+      text-align: center;
+      margin: 10px 0;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+    .focus-outline:focus {
+      outline: 3px solid #4CAF50;
+      outline-offset: 2px;
+    }
+    .accessibility-controls {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:focus + .slider {
+      box-shadow: 0 0 1px #4CAF50;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .voice-controls select {
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    @media (max-width: 768px) {
+      .main-content {
+        flex-direction: column;
+      }
+      .accessibility-controls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>视障人士外出安全辅助</h1>
+      <p>使用摄像头实时获取画面并提示周边环境安全信息</p>
+    </header>
+    
+    <div class="main-content">
+      <div class="video-container" role="region" aria-label="摄像头控制区域">
+        <h2 id="videoHeading">摄像头画面</h2>
+        <div class="video-wrapper" aria-describedby="videoHeading">
+          <video id="videoElement" autoplay playsinline aria-label="实时摄像头画面"></video>
+          <canvas id="canvas"></canvas>
+        </div>
+        <div class="controls" role="toolbar" aria-label="摄像头控制">
+          <button id="controlButton" class="focus-outline" aria-label="开启摄像头与安全辅助">开启摄像头与辅助</button>
+        </div>
+        <p id="videoStatus" class="status" role="status" aria-live="polite">摄像头与辅助已关闭</p>
+        <div id="browserWarning" class="error" style="display:none;" role="alert"></div>
+        
+        <!-- 备用图片上传功能 -->
+        <div id="imageUploadContainer" style="margin-top: 15px; display: none;">
+          <hr>
+          <h3>备用图片上传功能</h3>
+          <p>如果摄像头不可用，您可以上传图片进行分析</p>
+          <input type="file" id="imageFileInput" class="focus-outline" accept="image/*" aria-label="选择图片文件" />
+          <button id="uploadImageButton" class="focus-outline" aria-label="上传并分析图片">上传并分析</button>
+        </div>
+      </div>
+      
+      <div class="chat-container" role="region" aria-label="AI描述区域">
+        <h2 id="chatHeading">安全提示</h2>
+        <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-labelledby="chatHeading" tabindex="0"></div>
+        <div class="input-area" role="form">
+          <label for="messageInput" class="sr-only">输入提示词</label>
+          <input type="text" id="messageInput" class="focus-outline" placeholder="输入特定需求，如'注意红绿灯'或'寻找座位'..." aria-label="输入特定需求，引导系统关注特定信息" />
+          <button id="sendButton" class="focus-outline" aria-label="发送提示词">发送</button>
+        </div>
+        <p id="chatStatus" class="status" role="status" aria-live="polite">等待连接...</p>
+        
+        <div class="accessibility-controls" role="region" aria-labelledby="accessibilityHeading">
+          <h3 id="accessibilityHeading">无障碍功能</h3>
+          <div>
+            <label for="ttsToggle" class="toggle-switch">
+              <input type="checkbox" id="ttsToggle" checked aria-label="开启或关闭语音播报">
+              <span class="slider"></span>
+            </label>
+            <span id="ttsLabel">语音播报已开启</span>
+          </div>
+          
+          <div class="voice-controls">
+            <label for="voiceSelect">选择语音：</label>
+            <select id="voiceSelect" class="focus-outline" aria-label="选择语音类型"></select>
+          </div>
+          
+          <div>
+            <label for="rateRange">语速：</label>
+            <input type="range" id="rateRange" min="0.5" max="2" step="0.1" value="1.5" class="focus-outline" aria-label="调整语音速度">
+            <span id="rateValue">1.5</span>
+          </div>
+          
+          <button id="speakNowButton" class="focus-outline" aria-label="立即朗读当前描述">立即朗读当前描述</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // DOM元素
+      const videoElement = document.getElementById('videoElement');
+      const canvas = document.getElementById('canvas');
+      const controlButton = document.getElementById('controlButton');
+      const videoStatus = document.getElementById('videoStatus');
+      const chatMessages = document.getElementById('chatMessages');
+      const messageInput = document.getElementById('messageInput');
+      const sendButton = document.getElementById('sendButton');
+      const chatStatus = document.getElementById('chatStatus');
+      
+      // 无障碍控制元素
+      const ttsToggle = document.getElementById('ttsToggle');
+      const ttsLabel = document.getElementById('ttsLabel');
+      const voiceSelect = document.getElementById('voiceSelect');
+      const rateRange = document.getElementById('rateRange');
+      const rateValue = document.getElementById('rateValue');
+      const speakNowButton = document.getElementById('speakNowButton');
+
+      // 备用图片上传功能
+      const imageUploadContainer = document.getElementById('imageUploadContainer');
+      const imageFileInput = document.getElementById('imageFileInput');
+      const uploadImageButton = document.getElementById('uploadImageButton');
+
+      // Socket.io连接
+      const socket = io();
+      let isCapturing = false;
+      let captureInterval;
+      let stream = null;
+
+      // 视频流配置
+      const constraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 15 }
+        }
+      };
+      
+      // TTS功能初始化
+      let speechSynthesisInstance = null;
+      let speechUtterance = null;
+      let voices = [];
+      let selectedVoice = null;
+      let isSpeaking = false;
+      let currentText = "";
+      let ttsEnabled = true;
+      
+      // 安全获取语音合成API
+      function getSpeechSynthesis() {
+        if (speechSynthesisInstance === null) {
+          try {
+            speechSynthesisInstance = window.speechSynthesis || null;
+          } catch (e) {
+            console.error('获取语音合成API失败:', e);
+            speechSynthesisInstance = null;
+          }
+        }
+        return speechSynthesisInstance;
+      }
+      
+      // 检查TTS支持
+      function checkTTSSupport() {
+        const synth = getSpeechSynthesis();
+        const supportsTTS = synth !== null && typeof synth !== 'undefined';
+        
+        if (!supportsTTS) {
+          console.error('浏览器不支持语音合成API');
+          ttsToggle.disabled = true;
+          ttsToggle.checked = false;
+          ttsEnabled = false;
+          ttsLabel.textContent = '当前浏览器不支持语音合成';
+        }
+        
+        return supportsTTS;
+      }
+      
+      // 朗读文本
+      function speakText(text) {
+        const synth = getSpeechSynthesis();
+        if (!ttsEnabled || !synth || !text) return;
+        
+        // 如果正在朗读，先停止
+        if (isSpeaking) {
+          stopSpeaking();
+        }
+        
+        try {
+          speechUtterance = new SpeechSynthesisUtterance(text);
+          
+          if (selectedVoice) {
+            speechUtterance.voice = selectedVoice;
+          }
+          
+          speechUtterance.rate = parseFloat(rateRange.value);
+          speechUtterance.lang = selectedVoice ? selectedVoice.lang : 'zh-CN';
+          
+          speechUtterance.onstart = () => {
+            isSpeaking = true;
+          };
+          
+          speechUtterance.onend = () => {
+            isSpeaking = false;
+          };
+          
+          speechUtterance.onerror = (event) => {
+            console.error('语音合成错误:', event);
+            isSpeaking = false;
+          };
+          
+          synth.speak(speechUtterance);
+        } catch (e) {
+          console.error('语音播报失败:', e);
+          ttsEnabled = false;
+          ttsToggle.checked = false;
+          ttsLabel.textContent = '语音播报功能不可用';
+        }
+      }
+      
+      // 停止朗读
+      function stopSpeaking() {
+        const synth = getSpeechSynthesis();
+        if (synth && isSpeaking) {
+          try {
+            synth.cancel();
+            isSpeaking = false;
+          } catch (e) {
+            console.error('停止语音合成失败:', e);
+          }
+        }
+      }
+      
+      // 公告消息（不使用TTS开关）
+      function announceMessage(text) {
+        const synth = getSpeechSynthesis();
+        if (!synth || !text) return;
+        
+        try {
+          const announcement = new SpeechSynthesisUtterance(text);
+          if (selectedVoice) {
+            announcement.voice = selectedVoice;
+          }
+          announcement.rate = parseFloat(rateRange.value);
+          synth.speak(announcement);
+        } catch (e) {
+          console.error('公告播报失败:', e);
+        }
+      }
+      
+      // 初始化语音合成
+      function initSpeechSynthesis() {
+        const synth = getSpeechSynthesis();
+        if (!synth) {
+          ttsToggle.disabled = true;
+          ttsLabel.textContent = '当前浏览器不支持语音合成';
+          // 提供可见的错误消息
+          document.getElementById('browserWarning').innerHTML = 
+            '<p>您的浏览器不支持语音合成功能。请尝试使用Chrome或Safari的最新版本。</p>';
+          document.getElementById('browserWarning').style.display = 'block';
+          return false;
+        }
+        
+        // 加载可用的语音
+        function loadVoices() {
+          try {
+            voices = synth.getVoices();
+            
+            // 清空下拉列表
+            voiceSelect.innerHTML = '';
+            
+            // 检查是否有可用语音
+            if (!voices || voices.length === 0) {
+              setTimeout(loadVoices, 1000); // 在某些移动设备上可能需要延迟加载
+              return;
+            }
+            
+            // 过滤中文语音
+            const chineseVoices = voices.filter(voice => 
+              voice.lang.includes('zh') || voice.lang.includes('cmn')
+            );
+            
+            // 如果没有中文语音，就显示所有语音
+            const voicesToShow = chineseVoices.length > 0 ? chineseVoices : voices;
+            
+            // 添加语音选项
+            voicesToShow.forEach((voice, index) => {
+              const option = document.createElement('option');
+              option.textContent = `${voice.name} (${voice.lang})`;
+              option.setAttribute('data-voice-uri', voice.voiceURI);
+              option.value = index;
+              voiceSelect.appendChild(option);
+            });
+            
+            // 默认选择第一个中文语音
+            if (voicesToShow.length > 0) {
+              selectedVoice = voicesToShow[0];
+              // 尝试找到更合适的语音
+              for (let i = 0; i < voicesToShow.length; i++) {
+                if (voicesToShow[i].name.includes('Xiaoyi') || 
+                    voicesToShow[i].name.includes('Microsoft') ||
+                    voicesToShow[i].name.includes('Chinese')) {
+                  selectedVoice = voicesToShow[i];
+                  voiceSelect.value = i;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.error('加载语音失败:', e);
+          }
+        }
+        
+        // 处理语音选择更改
+        voiceSelect.addEventListener('change', () => {
+          try {
+            const selectedIndex = parseInt(voiceSelect.value);
+            if (!isNaN(selectedIndex) && selectedIndex >= 0 && selectedIndex < voices.length) {
+              selectedVoice = voices[selectedIndex];
+            }
+          } catch (e) {
+            console.error('语音选择变更失败:', e);
+          }
+        });
+        
+        // 延迟加载语音列表
+        setTimeout(() => {
+          try {
+            loadVoices();
+            
+            // 在某些设备上需要监听语音变化事件
+            if (synth.onvoiceschanged !== undefined) {
+              synth.onvoiceschanged = loadVoices;
+            }
+          } catch (e) {
+            console.error('语音初始化失败:', e);
+          }
+        }, 100);
+        
+        // 处理语速更改
+        rateRange.addEventListener('input', () => {
+          rateValue.textContent = rateRange.value;
+        });
+        
+        // 处理TTS开关
+        ttsToggle.addEventListener('change', () => {
+          ttsEnabled = ttsToggle.checked;
+          ttsLabel.textContent = ttsEnabled ? '语音播报已开启' : '语音播报已关闭';
+          
+          if (!ttsEnabled && isSpeaking) {
+            stopSpeaking();
+          }
+        });
+        
+        // 立即朗读按钮
+        speakNowButton.addEventListener('click', () => {
+          if (currentText) {
+            speakText(currentText);
+          } else {
+            announceMessage('没有可朗读的内容');
+          }
+        });
+        
+        return true;
+      }
+      
+      // 初始化TTS并添加移动设备检测
+      setTimeout(() => {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // 在移动设备上等待更长时间以确保API可用
+        if (isMobile) {
+          document.getElementById('browserWarning').innerHTML += 
+            '<p>移动设备提示：如果语音功能不工作，请尝试点击屏幕任意位置来激活语音功能。</p>';
+          document.getElementById('browserWarning').style.display = 'block';
+        }
+        
+        initSpeechSynthesis();
+      }, 500);
+      
+      // 添加媒体设备API兼容性处理
+      function checkMediaDevicesSupport() {
+        // 检查浏览器是否支持mediaDevices
+        if (!navigator.mediaDevices) {
+          navigator.mediaDevices = {};
+        }
+        
+        // 检查getUserMedia支持
+        if (!navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia = function(constraints) {
+            // 获取较老的浏览器版本中可能存在的getUserMedia实现
+            const getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+            
+            if (!getUserMedia) {
+              videoStatus.textContent = '您的浏览器不支持摄像头访问功能';
+              announceMessage('您的浏览器不支持摄像头访问功能，请尝试使用Chrome或Safari最新版本');
+              return Promise.reject(new Error('getUserMedia 不被支持'));
+            }
+            
+            // 封装旧的getUserMedia接口为Promise
+            return new Promise(function(resolve, reject) {
+              getUserMedia.call(navigator, constraints, resolve, reject);
+            });
+          };
+        }
+      }
+      
+      // 检查是否为安全上下文(HTTPS)
+      function checkSecureContext() {
+        if (window.isSecureContext === false) {
+          videoStatus.textContent = '需要在HTTPS安全环境下访问摄像头';
+          announceMessage('安全限制：请使用HTTPS协议访问此页面以启用摄像头功能');
+          controlButton.disabled = true;
+          return false;
+        }
+        return true;
+      }
+      
+      // 初始化摄像头环境
+      function initCameraEnvironment() {
+        try {
+          checkMediaDevicesSupport();
+          if (!checkSecureContext()) {
+             controlButton.disabled = true;
+             return false;
+          }
+          return true;
+        } catch (error) {
+          console.error('摄像头环境初始化失败:', error);
+          videoStatus.textContent = '摄像头初始化失败: ' + error.message;
+          announceMessage('摄像头功能初始化失败，请检查浏览器设置或尝试使用其他浏览器');
+          controlButton.disabled = true;
+          return false;
+        }
+      }
+      
+      // 启动摄像头并开始辅助的函数
+      async function startCameraAndCapture() {
+        if (stream && stream.active) {
+            console.log("摄像头已在运行。");
+            return;
+        }
+
+        try {
+          announceMessage('正在启动摄像头');
+          videoStatus.textContent = '正在启动摄像头...';
+          controlButton.disabled = true;
+
+          if (!checkBrowserCompatibility()) {
+            videoStatus.textContent = '您的浏览器不支持摄像头API';
+            announceMessage('您的浏览器不支持摄像头功能，请参考页面提示更换浏览器或设备');
+            controlButton.disabled = false;
+            return;
+          }
+
+          if (!initCameraEnvironment()) {
+             controlButton.disabled = false;
+            return;
+          }
+
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            constraints.video.facingMode = { ideal: 'environment' };
+            constraints.video.width = { ideal: 720 };
+            constraints.video.height = { ideal: 1280 };
+          }
+
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          videoElement.srcObject = stream;
+          await videoElement.play();
+
+          isCapturing = true;
+          captureInterval = setInterval(captureAndSend, 3000);
+
+          controlButton.textContent = '停止摄像头与辅助';
+          controlButton.setAttribute('aria-label', '停止摄像头与安全辅助');
+          controlButton.classList.add('active');
+          controlButton.disabled = false;
+          videoStatus.textContent = '摄像头与辅助已开启';
+          announceMessage('摄像头与安全辅助已开启');
+
+        } catch (error) {
+          console.error('启动摄像头或辅助失败:', error);
+          videoStatus.textContent = '启动失败: ' + error.message;
+          controlButton.textContent = '开启摄像头与辅助';
+          controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
+          controlButton.classList.remove('active');
+          controlButton.disabled = false;
+
+          let errorMessage = '启动摄像头或辅助失败，';
+          if (error.name === 'NotAllowedError') {
+            errorMessage += '请检查摄像头权限设置';
+          } else if (error.name === 'NotFoundError') {
+            errorMessage += '未找到可用摄像头设备';
+          } else if (error.name === 'NotReadableError') {
+            errorMessage += '摄像头可能被其他应用占用';
+          } else if (error.name === 'OverconstrainedError') {
+            errorMessage += '摄像头不支持请求的分辨率';
+            errorMessage += '. 请尝试刷新页面。';
+          } else {
+            errorMessage += error.message || '原因未知';
+          }
+          announceMessage(errorMessage);
+          
+          if (videoElement.srcObject) {
+             videoElement.srcObject.getTracks().forEach(track => track.stop());
+             videoElement.srcObject = null;
+          }
+          stream = null; 
+          if (captureInterval) {
+              clearInterval(captureInterval);
+              captureInterval = null;
+          }
+          isCapturing = false;
+        }
+      }
+
+      // 停止摄像头和辅助的函数
+      function stopCameraAndCapture() {
+         if (captureInterval) {
+             clearInterval(captureInterval);
+             captureInterval = null;
+         }
+         isCapturing = false;
+         announceMessage('已停止安全辅助');
+
+         if (stream) {
+           stream.getTracks().forEach(track => track.stop());
+           videoElement.srcObject = null;
+           stream = null;
+           announceMessage('摄像头已停止');
+         }
+         
+         controlButton.textContent = '开启摄像头与辅助';
+         controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
+         controlButton.classList.remove('active');
+         controlButton.disabled = false;
+         videoStatus.textContent = '摄像头与辅助已关闭';
+      }
+
+      // 控制按钮的点击事件
+      controlButton.addEventListener('click', () => {
+        if (!isCapturing && !stream) {
+          startCameraAndCapture();
+        } else {
+          stopCameraAndCapture();
+        }
+      });
+
+      let previousImageData = null;
+      const CHANGE_THRESHOLD = 40;
+      
+      function calculateFrameDifference(currentImageData, previousImageData) {
+        const len = currentImageData.data.length;
+        let diffCount = 0;
+        
+        for (let i = 0; i < len; i += 4) {
+          const rDiff = Math.abs(currentImageData.data[i] - previousImageData.data[i]);
+          const gDiff = Math.abs(currentImageData.data[i + 1] - previousImageData.data[i + 1]);
+          const bDiff = Math.abs(currentImageData.data[i + 2] - previousImageData.data[i + 2]);
+          
+          if (rDiff > CHANGE_THRESHOLD || gDiff > CHANGE_THRESHOLD || bDiff > CHANGE_THRESHOLD) {
+            diffCount++;
+          }
+        }
+        
+        return (diffCount / (len / 4)) * 100;
+      }
+
+      function captureAndSend() {
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoElement, 0, 0);
+        
+        const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        if (previousImageData) {
+          const diffPercentage = calculateFrameDifference(currentImageData, previousImageData);
+          if (diffPercentage > 20) {
+            const frame = canvas.toDataURL('image/jpeg', 0.8);
+            const message = messageInput.value.trim();
+            socket.emit('videoFrame', { frame, message });
+            if (diffPercentage > 25) {
+              announceMessage('场景变化，正在分析');
+            }
+          }
+        }
+        
+        previousImageData = currentImageData;
+      }
+
+      sendButton.addEventListener('click', () => {
+        const message = messageInput.value.trim();
+        if (message) {
+          addMessage('用户', message);
+          messageInput.value = '';
+          announceMessage(`已发送提示: ${message}`);
+        }
+      });
+
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendButton.click();
+        }
+      });
+
+      function addMessage(sender, text) {
+        if (sender === 'AI') {
+          currentText = text;
+          chatMessages.textContent = text + '\n\n';
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          if (ttsEnabled && checkTTSSupport()) {
+            // const importantKeywords = ['危险', '注意', '小心', '障碍', '车辆', '红灯', '绿灯', '路口', '台阶', '坑洼', '人群'];
+            // const isImportant = importantKeywords.some(keyword => text.includes(keyword));
+            
+            // if (text.length < 30 || isImportant) {
+            //   speakText(text);
+            // } else {
+            //   const sentences = text.split(/[,.;!?。，；！？]/);
+            //   const importantSentences = sentences.filter(sentence => 
+            //     importantKeywords.some(keyword => sentence.includes(keyword))
+            //   );
+              
+            //   if (importantSentences.length > 0) {
+            //     speakText(importantSentences.join('。'));
+            //   }
+            // }
+            speakText(text);
+          }
+        } else if (sender === '用户') {
+          // 如果需要显示用户消息，可以在这里添加逻辑
+          // chatMessages.textContent += `你: ${text}\n\n`;
+          // chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      }
+
+      socket.on('connect', () => {
+        chatStatus.textContent = '已连接';
+        announceMessage('服务器已连接');
+      });
+
+      socket.on('disconnect', () => {
+        chatStatus.textContent = '连接断开';
+        announceMessage('服务器连接已断开');
+      });
+
+      socket.on('error', (error) => {
+        console.error('Socket错误:', error);
+        const errorMessage = error && error.message ? error.message : '未知错误';
+        chatStatus.textContent = '发生错误: ' + errorMessage;
+        announceMessage(`发生错误: ${errorMessage}`);
+
+        // 检查是否是速率限制错误
+        if (errorMessage.includes('请求过于频繁')) {
+          // 如果是速率限制错误，仅提示，不改变状态或停止捕获
+          console.log('速率限制错误，保持当前状态并继续尝试。');
+        } else {
+          // 对于其他错误，停止捕获并重置按钮状态
+          if (isCapturing) {
+             if (captureInterval) {
+                 clearInterval(captureInterval);
+                 captureInterval = null;
+             }
+             isCapturing = false;
+             controlButton.textContent = '开启摄像头与辅助';
+             controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
+             controlButton.classList.remove('active');
+             announceMessage('因错误停止辅助功能');
+          }
+          // 也可以考虑停止摄像头
+          // stopCameraAndCapture(); 
+        }
+      });
+
+      socket.on('aiResponse', (response) => {
+        let textToDisplay = response.text;
+        let shouldSpeak = false;
+
+        if (textToDisplay && typeof textToDisplay === 'string') {
+            if (textToDisplay.startsWith('[SPEAK]')) {
+                shouldSpeak = true;
+                textToDisplay = textToDisplay.substring(7).trim(); // 移除标记并去除空格
+            } else if (textToDisplay.startsWith('[INFO]')) {
+                textToDisplay = textToDisplay.substring(6).trim(); // 移除标记并去除空格
+            }
+            // 如果没有标记，则 textToDisplay 保持原样，shouldSpeak 保持 false
+
+            addMessage('AI', textToDisplay); // 显示处理后的文本
+
+            if (shouldSpeak && ttsEnabled && checkTTSSupport()) {
+                speakText(textToDisplay); // 如果需要播报，则播报处理后的文本
+            }
+        } else {
+            console.warn("Received empty or invalid aiResponse:", response);
+        }
+      });
+      
+      document.addEventListener('keydown', (e) => {
+        if (e.altKey && (e.key === 's' || e.key === 'c')) {
+          e.preventDefault();
+          controlButton.click();
+        }
+        else if (e.altKey && e.key === 'r') {
+          e.preventDefault();
+          speakNowButton.click();
+        }
+        else if (e.altKey && e.key === 't') {
+          e.preventDefault();
+          ttsToggle.checked = !ttsToggle.checked;
+          const event = new Event('change');
+          ttsToggle.dispatchEvent(event);
+        }
+      });
+      
+      setTimeout(() => {
+        announceMessage('欢迎使用视障人士外出安全辅助系统。请使用Alt+S或Alt+C开启或关闭摄像头与辅助，Alt+R朗读当前提示，Alt+T开关语音功能。');
+      }, 1000);
+
+      function checkBrowserCompatibility() {
+        const warningDiv = document.getElementById('browserWarning');
+        let warningMessage = '';
+        
+        if (typeof navigator.mediaDevices === 'undefined') {
+          warningMessage += '<p>您的浏览器不支持媒体设备API(MediaDevices)。';
+          
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+              warningMessage += '<p>iOS设备建议：<br>1. 请使用Safari浏览器<br>2. 确保iOS版本至少为11.0或更高<br>3. 确保未禁用摄像头权限</p>';
+            } else if (/Android/i.test(navigator.userAgent)) {
+              warningMessage += '<p>Android设备建议：<br>1. 请使用Chrome或Firefox最新版本<br>2. 确保已授予摄像头权限<br>3. 尝试清除浏览器缓存后重试</p>';
+            }
+          } else {
+            warningMessage += '<p>桌面设备建议：<br>1. 请使用Chrome、Firefox或Edge最新版本<br>2. 确保网站使用HTTPS协议访问<br>3. 检查是否已授予摄像头权限</p>';
+          }
+          
+          warningMessage += '<p>您可以使用下方的图片上传功能作为替代方案。</p>';
+          
+          warningDiv.innerHTML = warningMessage;
+          warningDiv.style.display = 'block';
+          
+          imageUploadContainer.style.display = 'block';
+          
+          return false;
+        }
+        
+        if (window.isSecureContext === false) {
+          warningDiv.innerHTML = '<p>需要在HTTPS安全环境下访问摄像头。请使用HTTPS协议访问此页面。</p><p>您可以使用下方的图片上传功能作为替代方案。</p>';
+          warningDiv.style.display = 'block';
+          
+          imageUploadContainer.style.display = 'block';
+        }
+        
+        return true;
+      }
+      
+      checkBrowserCompatibility();
+
+      uploadImageButton.addEventListener('click', () => {
+        const file = imageFileInput.files[0];
+        if (!file) {
+          announceMessage('请先选择图片文件');
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imageData = e.target.result.split(',')[1];
+          const message = messageInput.value.trim();
+          
+          fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              imageData: imageData,
+              message: message || '请描述画面中的重要信息'
+            })
+          })
+          .then(response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            
+            function readStream() {
+              reader.read().then(({ done, value }) => {
+                if (done) {
+                  return;
+                }
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop() || '';
+                
+                let fullResponse = '';
+                
+                lines.forEach(line => {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                      return;
+                    }
+                    
+                    try {
+                      const parsed = JSON.parse(data);
+                      if (parsed.text) {
+                        fullResponse += parsed.text;
+                        addMessage('AI', fullResponse, true);
+                      }
+                    } catch (err) {
+                      console.error('解析响应错误:', err);
+                    }
+                  }
+                });
+                
+                readStream();
+              }).catch(err => {
+                console.error('读取流错误:', err);
+                chatStatus.textContent = '处理图片时出错';
+                announceMessage('处理图片时出错，请重试');
+              });
+            }
+            
+            readStream();
+          })
+          .catch(error => {
+            console.error('上传图片错误:', error);
+            chatStatus.textContent = '上传图片失败: ' + error.message;
+            announceMessage('上传图片失败，请重试');
+          });
+          
+          announceMessage('正在分析上传的图片，请稍候');
+        };
+        
+        reader.readAsDataURL(file);
+      });
+      
+      imageFileInput.addEventListener('change', () => {
+        const file = imageFileInput.files[0];
+        if (file) {
+          announceMessage(`已选择文件: ${file.name}`);
+        }
+      });
+
+      document.addEventListener('touchstart', function() {
+        const synth = getSpeechSynthesis();
+        if (synth && !isSpeaking) {
+          const silence = new SpeechSynthesisUtterance('');
+          silence.volume = 0;
+          synth.speak(silence);
+          synth.cancel();
+        }
+      }, { once: true });
+    });
+  </script>
+</body>
+</html>

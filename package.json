@@ -1,0 +1,33 @@
+{
+  "name": "ai-video-chat",
+  "version": "1.0.0",
+  "description": "实时与AI视频聊天应用 - 支持视障人士的无障碍功能",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.js",
+    "dev": "bun --watch run server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "openai": "^4.95.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/dom-speech-recognition": "^0.0.4",
+    "bun-types": "latest"
+  },
+  "keywords": [
+    "ai",
+    "video",
+    "chat",
+    "accessibility",
+    "tts",
+    "speech synthesis",
+    "视障人士",
+    "无障碍"
+  ]
+}
