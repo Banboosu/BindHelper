@@ -125,6 +125,9 @@
     .status {
       text-align: center;
       margin: 10px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-style: italic;
       color: #666;
     }
@@ -213,6 +216,50 @@
         align-items: flex-start;
       }
     }
+    /* 加载状态样式 */
+    .loading-indicator {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(76, 175, 80, 0.3);
+      border-radius: 50%;
+      border-top-color: #4CAF50;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* 拖放区域样式 */
+    #dropZone {
+      transition: all 0.3s ease;
+      min-height: 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    #dropZone:hover {
+      background-color: #e8f4e9 !important;
+      border-color: #45a049 !important;
+    }
+    
+    #dropZone p {
+      margin: 5px 0;
+      color: #666;
+    }
+    
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      #dropZone {
+        padding: 15px 10px !important;
+        min-height: 80px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -228,6 +275,7 @@
         <div class="video-wrapper" aria-describedby="videoHeading">
           <video id="videoElement" autoplay playsinline aria-label="实时摄像头画面"></video>
           <canvas id="canvas"></canvas>
+          <img id="previewImage" style="display: none; width: 100%; height: auto; position: absolute; top: 0; left: 0;" aria-label="上传图片预览"/>
         </div>
         <div class="controls" role="toolbar" aria-label="摄像头控制">
           <button id="controlButton" class="focus-outline" aria-label="开启摄像头与安全辅助">开启摄像头与辅助</button>
@@ -235,13 +283,28 @@
         <p id="videoStatus" class="status" role="status" aria-live="polite">摄像头与辅助已关闭</p>
         <div id="browserWarning" class="error" style="display:none;" role="alert"></div>
         
-        <!-- 备用图片上传功能 -->
-        <div id="imageUploadContainer" style="margin-top: 15px; display: none;">
+        <!-- 增强图片上传区域的UI -->
+        <div id="imageUploadContainer" style="margin-top: 15px;">
           <hr>
-          <h3>备用图片上传功能</h3>
-          <p>如果摄像头不可用，您可以上传图片进行分析</p>
-          <input type="file" id="imageFileInput" class="focus-outline" accept="image/*" aria-label="选择图片文件" />
-          <button id="uploadImageButton" class="focus-outline" aria-label="上传并分析图片">上传并分析</button>
+          <h3>图片上传功能</h3>
+          <p>您可以上传图片进行分析，或用于调试和演示</p>
+          
+          <!-- 拖放区域 -->
+          <div id="dropZone" class="focus-outline" style="border: 2px dashed #3498db; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 10px; background-color: #f8f9fa; cursor: pointer;">
+            <p><i>拖放图片到此处，或点击选择文件</i></p>
+            <p><i>也可以直接粘贴剪贴板中的图片 (Ctrl+V)</i></p>
+            <input type="file" id="imageFileInput" class="focus-outline" accept="image/*" aria-label="选择图片文件" style="display: none;" />
+          </div>
+          
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="uploadImageButton" class="focus-outline" aria-label="上传并分析图片">上传并分析</button>
+            <button id="showInVideoButton" class="focus-outline" aria-label="在视频区域显示图片">在视频区域显示</button>
+            <button id="clearImageButton" class="focus-outline" aria-label="清除图片" style="background-color: #e74c3c;">清除图片</button>
+          </div>
+          <div style="margin-top: 10px;">
+            <button id="analyzeCurrentImageButton" class="focus-outline" style="background-color: #3498db; width: 100%;" aria-label="分析当前显示的图片">分析当前显示的图片</button>
+            <button id="captureScreenshotButton" class="focus-outline" style="background-color: #9b59b6; width: 100%; margin-top: 5px;" aria-label="截取当前画面">截取当前画面</button>
+          </div>
         </div>
       </div>
       
@@ -307,6 +370,12 @@
       const imageUploadContainer = document.getElementById('imageUploadContainer');
       const imageFileInput = document.getElementById('imageFileInput');
       const uploadImageButton = document.getElementById('uploadImageButton');
+      const showInVideoButton = document.getElementById('showInVideoButton');
+      const clearImageButton = document.getElementById('clearImageButton');
+
+      // 添加变量引用
+      const analyzeCurrentImageButton = document.getElementById('analyzeCurrentImageButton');
+      const captureScreenshotButton = document.getElementById('captureScreenshotButton');
 
       // Socket.io连接
       const socket = io();
@@ -314,12 +383,12 @@
       let captureInterval;
       let stream = null;
 
-      // 视频流配置
+      // 视频流配置 - 降低分辨率以减少网络带宽和处理负担
       const constraints = {
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 15 }
+          width: { ideal: 640 },    // 从1280降低到640
+          height: { ideal: 480 },   // 从720降低到480
+          frameRate: { ideal: 10 }  // 从15降低到10
         }
       };
       
@@ -361,7 +430,7 @@
         return supportsTTS;
       }
       
-      // 朗读文本
+      // 修复语音合成函数，确保完整句子一次性朗读
       function speakText(text) {
         const synth = getSpeechSynthesis();
         if (!ttsEnabled || !synth || !text) return;
@@ -372,7 +441,23 @@
         }
         
         try {
-          speechUtterance = new SpeechSynthesisUtterance(text);
+          // 解析文本，移除多余的句号和空格
+          let cleanedText = text.trim();
+          
+          // 移除单独的标点符号行
+          cleanedText = cleanedText.replace(/^\s*[.。，,;；!！?？]\s*$/gm, '');
+          
+          // 移除重复的标点符号
+          cleanedText = cleanedText.replace(/([.。，,;；!！?？])\1+/g, '$1');
+          
+          // 移除不必要的空白行
+          cleanedText = cleanedText.replace(/\n\s*\n/g, '\n');
+          
+          if (!cleanedText) return; // 如果清理后没有内容则不朗读
+          
+          console.log('准备朗读文本:', cleanedText);
+          
+          speechUtterance = new SpeechSynthesisUtterance(cleanedText);
           
           if (selectedVoice) {
             speechUtterance.voice = selectedVoice;
@@ -383,10 +468,12 @@
           
           speechUtterance.onstart = () => {
             isSpeaking = true;
+            console.log('语音合成开始');
           };
           
           speechUtterance.onend = () => {
             isSpeaking = false;
+            console.log('语音合成结束');
           };
           
           speechUtterance.onerror = (event) => {
@@ -628,11 +715,11 @@
 
         try {
           announceMessage('正在启动摄像头');
-          videoStatus.textContent = '正在启动摄像头...';
+          updateStatus(videoStatus, '正在启动摄像头...', true);
           controlButton.disabled = true;
 
           if (!checkBrowserCompatibility()) {
-            videoStatus.textContent = '您的浏览器不支持摄像头API';
+            updateStatus(videoStatus, '您的浏览器不支持摄像头API');
             announceMessage('您的浏览器不支持摄像头功能，请参考页面提示更换浏览器或设备');
             controlButton.disabled = false;
             return;
@@ -647,26 +734,36 @@
           if (isMobile) {
             constraints.video.facingMode = { ideal: 'environment' };
             constraints.video.width = { ideal: 720 };
-            constraints.video.height = { ideal: 1280 };
+            constraints.video.height = { ideal: 480 };
           }
 
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           videoElement.srcObject = stream;
           await videoElement.play();
 
+          updateStatus(videoStatus, '摄像头已开启，正在初始化分析...');
+          
+          // 初始化场景分析
+          canvas.width = videoElement.videoWidth;
+          canvas.height = videoElement.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(videoElement, 0, 0);
+          previousImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
           isCapturing = true;
-          captureInterval = setInterval(captureAndSend, 3000);
+          // 捕获间隔从3000ms(3秒)增加到4000ms(4秒)以减轻服务器负担
+          captureInterval = setInterval(captureAndSend, 4000);
 
           controlButton.textContent = '停止摄像头与辅助';
           controlButton.setAttribute('aria-label', '停止摄像头与安全辅助');
           controlButton.classList.add('active');
           controlButton.disabled = false;
-          videoStatus.textContent = '摄像头与辅助已开启';
+          updateStatus(videoStatus, '摄像头与辅助已开启');
           announceMessage('摄像头与安全辅助已开启');
 
         } catch (error) {
           console.error('启动摄像头或辅助失败:', error);
-          videoStatus.textContent = '启动失败: ' + error.message;
+          updateStatus(videoStatus, '启动失败: ' + error.message);
           controlButton.textContent = '开启摄像头与辅助';
           controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
           controlButton.classList.remove('active');
@@ -710,6 +807,7 @@
          announceMessage('已停止安全辅助');
 
          if (stream) {
+           updateStatus(videoStatus, '正在关闭摄像头...');
            stream.getTracks().forEach(track => track.stop());
            videoElement.srcObject = null;
            stream = null;
@@ -720,7 +818,7 @@
          controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
          controlButton.classList.remove('active');
          controlButton.disabled = false;
-         videoStatus.textContent = '摄像头与辅助已关闭';
+         updateStatus(videoStatus, '摄像头与辅助已关闭');
       }
 
       // 控制按钮的点击事件
@@ -752,27 +850,68 @@
         return (diffCount / (len / 4)) * 100;
       }
 
-      function captureAndSend() {
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(videoElement, 0, 0);
+      // 更新状态显示函数
+      function updateStatus(element, message, isLoading = false) {
+        if (!element) return;
         
-        const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // 清除旧的加载指示器
+        element.innerHTML = '';
         
-        if (previousImageData) {
-          const diffPercentage = calculateFrameDifference(currentImageData, previousImageData);
-          if (diffPercentage > 20) {
-            const frame = canvas.toDataURL('image/jpeg', 0.8);
-            const message = messageInput.value.trim();
-            socket.emit('videoFrame', { frame, message });
-            if (diffPercentage > 25) {
-              announceMessage('场景变化，正在分析');
-            }
-          }
+        if (isLoading) {
+          const loadingSpinner = document.createElement('span');
+          loadingSpinner.className = 'loading-indicator';
+          element.appendChild(loadingSpinner);
         }
         
-        previousImageData = currentImageData;
+        const statusText = document.createElement('span');
+        statusText.textContent = ' ' + message;
+        element.appendChild(statusText);
+      }
+
+      function captureAndSend() {
+        // 如果用户显示上传的图片，跳过摄像头捕获
+        if (isUsingUploadedImage) {
+          // console.log("跳过帧捕获：正在显示上传的图片");
+          return;
+        }
+        
+        if (!isCapturing || !stream || !stream.active) {
+          console.log("跳过帧捕获：摄像头未开启");
+          return;
+        }
+        
+        try {
+          canvas.width = videoElement.videoWidth;
+          canvas.height = videoElement.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(videoElement, 0, 0);
+          
+          // 获取当前帧图像数据用于场景变化检测
+          const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // 执行场景检测
+          if (previousImageData) {
+            const diffPercentage = calculateFrameDifference(currentImageData, previousImageData);
+            
+            // 将检测阈值调整为25%，减少连续相似画面的处理
+            if (diffPercentage > 25) {
+              updateStatus(chatStatus, "正在处理...", true);
+              const frame = canvas.toDataURL('image/jpeg', 0.7); // 降低质量到0.7
+              const message = messageInput.value.trim();
+              
+              // 发送到服务器前记录日志
+              console.log(`发送视频帧: 场景变化率 ${diffPercentage.toFixed(1)}%, 帧大小约 ${Math.round(frame.length/1024)}KB`);
+              
+              socket.emit('videoFrame', { frame, message });
+            }
+          }
+          
+          // 保存当前帧为下一次比较的基准
+          previousImageData = currentImageData;
+        } catch (error) {
+          console.error('捕获视频帧错误:', error);
+          updateStatus(chatStatus, `捕获错误: ${error.message}`);
+        }
       }
 
       sendButton.addEventListener('click', () => {
@@ -792,26 +931,31 @@
 
       function addMessage(sender, text) {
         if (sender === 'AI') {
-          currentText = text;
-          chatMessages.textContent = text + '\n\n';
+          // 清理显示文本，去除不必要的标点符号和空行
+          let cleanedText = text.trim();
+          
+          // 移除只包含标点的行
+          cleanedText = cleanedText.replace(/^\s*[.。，,;；!！?？]+\s*$/gm, '');
+          
+          // 移除多余的重复标点
+          cleanedText = cleanedText.replace(/([.。，,;；!！?？])\1+/g, '$1');
+          
+          // 移除多余的空行
+          cleanedText = cleanedText.replace(/\n\s*\n/g, '\n');
+          
+          if (!cleanedText.trim()) {
+            console.warn('警告: AI响应清理后为空文本:', text);
+            cleanedText = '(获取到空响应，请重试)';
+          }
+          
+          // 更新当前文本和显示区域
+          currentText = cleanedText;
+          chatMessages.textContent = cleanedText + '\n\n';
           chatMessages.scrollTop = chatMessages.scrollHeight;
+          
+          // 文本已在speakText函数中清理，不需要重复清理
           if (ttsEnabled && checkTTSSupport()) {
-            // const importantKeywords = ['危险', '注意', '小心', '障碍', '车辆', '红灯', '绿灯', '路口', '台阶', '坑洼', '人群'];
-            // const isImportant = importantKeywords.some(keyword => text.includes(keyword));
-            
-            // if (text.length < 30 || isImportant) {
-            //   speakText(text);
-            // } else {
-            //   const sentences = text.split(/[,.;!?。，；！？]/);
-            //   const importantSentences = sentences.filter(sentence => 
-            //     importantKeywords.some(keyword => sentence.includes(keyword))
-            //   );
-              
-            //   if (importantSentences.length > 0) {
-            //     speakText(importantSentences.join('。'));
-            //   }
-            // }
-            speakText(text);
+            speakText(cleanedText);
           }
         } else if (sender === '用户') {
           // 如果需要显示用户消息，可以在这里添加逻辑
@@ -821,27 +965,41 @@
       }
 
       socket.on('connect', () => {
-        chatStatus.textContent = '已连接';
+        updateStatus(chatStatus, '服务已连接');
         announceMessage('服务器已连接');
       });
 
       socket.on('disconnect', () => {
-        chatStatus.textContent = '连接断开';
+        updateStatus(chatStatus, '连接断开');
         announceMessage('服务器连接已断开');
       });
 
       socket.on('error', (error) => {
         console.error('Socket错误:', error);
         const errorMessage = error && error.message ? error.message : '未知错误';
-        chatStatus.textContent = '发生错误: ' + errorMessage;
-        announceMessage(`发生错误: ${errorMessage}`);
-
-        // 检查是否是速率限制错误
-        if (errorMessage.includes('请求过于频繁')) {
-          // 如果是速率限制错误，仅提示，不改变状态或停止捕获
-          console.log('速率限制错误，保持当前状态并继续尝试。');
+        updateStatus(chatStatus, '发生错误: ' + errorMessage);
+        
+        // 提供更详细的错误反馈
+        if (errorMessage.includes('处理视频帧时出错')) {
+          // 处理服务器端AI处理错误
+          updateStatus(chatStatus, '视觉分析暂时不可用，请稍后重试');
+          announceMessage('视觉分析服务暂时不可用，正在自动恢复中');
+          
+          // 不中断服务，等待下一次尝试
+          console.log('AI处理错误，等待下一帧尝试');
+        } else if (errorMessage.includes('请求过于频繁')) {
+          // 速率限制错误，静默处理，不通知用户
+          console.log('速率限制错误，降低请求频率');
+          
+          // 临时增加捕获间隔以应对速率限制
+          if (captureInterval) {
+            clearInterval(captureInterval);
+            captureInterval = setInterval(captureAndSend, 5000); // 临时延长到5秒
+          }
         } else {
-          // 对于其他错误，停止捕获并重置按钮状态
+          // 其他错误，停止捕获并重置按钮状态
+          announceMessage(`发生错误: ${errorMessage}`);
+          
           if (isCapturing) {
              if (captureInterval) {
                  clearInterval(captureInterval);
@@ -851,33 +1009,47 @@
              controlButton.textContent = '开启摄像头与辅助';
              controlButton.setAttribute('aria-label', '开启摄像头与安全辅助');
              controlButton.classList.remove('active');
-             announceMessage('因错误停止辅助功能');
+             announceMessage('由于错误，安全辅助已暂停，请重新启动');
           }
-          // 也可以考虑停止摄像头
-          // stopCameraAndCapture(); 
         }
       });
 
       socket.on('aiResponse', (response) => {
+        updateStatus(chatStatus, "已收到分析结果");
+        
         let textToDisplay = response.text;
-        let shouldSpeak = false;
-
+        
         if (textToDisplay && typeof textToDisplay === 'string') {
-            if (textToDisplay.startsWith('[SPEAK]')) {
-                shouldSpeak = true;
-                textToDisplay = textToDisplay.substring(7).trim(); // 移除标记并去除空格
-            } else if (textToDisplay.startsWith('[INFO]')) {
-                textToDisplay = textToDisplay.substring(6).trim(); // 移除标记并去除空格
-            }
-            // 如果没有标记，则 textToDisplay 保持原样，shouldSpeak 保持 false
-
-            addMessage('AI', textToDisplay); // 显示处理后的文本
-
+          // 处理标记
+          let shouldSpeak = true; // 默认播放语音
+          if (textToDisplay.startsWith('[SPEAK]')) {
+            textToDisplay = textToDisplay.substring(7).trim(); // 移除标记并去除空格
+          } else if (textToDisplay.startsWith('[INFO]')) {
+            textToDisplay = textToDisplay.substring(6).trim(); // 移除标记并去除空格
+            shouldSpeak = false; // INFO标记不播放语音
+          }
+          
+          // 清理显示文本，去除不必要的标点和空行
+          let cleanedText = textToDisplay.trim();
+          cleanedText = cleanedText.replace(/^\s*[.。，,;；!！?？]\s*$/gm, '');
+          cleanedText = cleanedText.replace(/([.。，,;；!！?？])\1+/g, '$1');
+          cleanedText = cleanedText.replace(/\n\s*\n/g, '\n');
+          
+          if (cleanedText.trim()) {
+            console.log('显示和播报文本:', cleanedText);
+            
+            // 显示处理后的文本
+            addMessage('AI', cleanedText);
+            
+            // 如果需要播报，则播报处理后的文本
             if (shouldSpeak && ttsEnabled && checkTTSSupport()) {
-                speakText(textToDisplay); // 如果需要播报，则播报处理后的文本
+              speakText(cleanedText);
             }
+          } else {
+            console.warn("清理后文本为空:", textToDisplay);
+          }
         } else {
-            console.warn("Received empty or invalid aiResponse:", response);
+          console.warn("Received empty or invalid aiResponse:", response);
         }
       });
       
@@ -899,7 +1071,7 @@
       });
       
       setTimeout(() => {
-        announceMessage('欢迎使用视障人士外出安全辅助系统。请使用Alt+S或Alt+C开启或关闭摄像头与辅助，Alt+R朗读当前提示，Alt+T开关语音功能。');
+        announceMessage('欢迎使用视障人士外出安全辅助系统。');
       }, 1000);
 
       function checkBrowserCompatibility() {
@@ -942,86 +1114,447 @@
       
       checkBrowserCompatibility();
 
+      // 增加图片处理相关变量和函数
+      let lastUploadedImage = null;
+      let isUsingUploadedImage = false;
+
+      // 显示上传的图片在预览区域
+      function displayImageInVideoArea(imageDataUrl) {
+        const previewImage = document.getElementById('previewImage');
+        
+        if (isCapturing && stream) {
+          // 如果摄像头正在运行，暂停捕获
+          updateStatus(videoStatus, '已暂停实时捕获，正在显示上传图片');
+        }
+        
+        // 显示图片
+        previewImage.src = imageDataUrl;
+        previewImage.style.display = 'block';
+        isUsingUploadedImage = true;
+        
+        // 更新状态
+        updateStatus(videoStatus, '显示上传的图片（实时捕获已暂停）');
+      }
+
+      // 清除预览区域的图片
+      function clearVideoAreaImage() {
+        const previewImage = document.getElementById('previewImage');
+        previewImage.style.display = 'none';
+        isUsingUploadedImage = false;
+        
+        if (isCapturing && stream) {
+          updateStatus(videoStatus, '已恢复实时捕获');
+        } else {
+          updateStatus(videoStatus, '摄像头未开启');
+        }
+      }
+
+      // 处理图片文件的函数
+      function processImageFile(file, forPreviewOnly = false) {
+        if (!file) {
+          announceMessage('请先选择图片文件');
+          return;
+        }
+        
+        if (!forPreviewOnly) {
+          updateStatus(chatStatus, "正在处理图片...", true);
+          announceMessage('正在分析上传的图片，请稍候');
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          // 创建图像对象以调整大小
+          const img = new Image();
+          img.onload = function() {
+            // 创建canvas进行压缩
+            const canvas = document.createElement('canvas');
+            // 最大尺寸控制
+            const MAX_WIDTH = 640;
+            const MAX_HEIGHT = 480;
+            
+            let width = img.width;
+            let height = img.height;
+            
+            // 按比例缩放
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // 绘制调整后的图像
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // 转为base64，降低图片质量到70%
+            const compressedImageData = canvas.toDataURL('image/jpeg', 0.7);
+            
+            // 保存最后处理的图像
+            lastUploadedImage = compressedImageData;
+            
+            if (forPreviewOnly) {
+              // 只显示图片，不进行分析
+              displayImageInVideoArea(compressedImageData);
+              return;
+            }
+            
+            const base64Data = compressedImageData.split(',')[1];
+            console.log(`原始图像大小: ${Math.round(e.target.result.length/1024)}KB, 压缩后: ${Math.round(compressedImageData.length/1024)}KB`);
+            
+            const message = messageInput.value.trim();
+            
+            fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                imageData: base64Data,
+                message: message || '请描述画面中的重要信息'
+              })
+            })
+            .then(response => {
+              updateStatus(chatStatus, "AI正在分析...", true);
+              
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = '';
+              let completeResponse = '';
+              
+              function readStream() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    updateStatus(chatStatus, "分析完成");
+                    
+                    // 在结束时显示和朗读完整的响应
+                    if (completeResponse.trim()) {
+                      addMessage('AI', completeResponse);
+                    }
+                    return;
+                  }
+                  
+                  buffer += decoder.decode(value, { stream: true });
+                  const lines = buffer.split('\n\n');
+                  buffer = lines.pop() || '';
+                  
+                  lines.forEach(line => {
+                    if (line.startsWith('data: ')) {
+                      const data = line.slice(6);
+                      if (data === '[DONE]') {
+                        updateStatus(chatStatus, "分析完成");
+                        return;
+                      }
+                      
+                      try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.text) {
+                          // 累积完整响应，但不立即显示
+                          completeResponse += parsed.text;
+                          // 更新状态以显示进度
+                          const wordCount = completeResponse.length;
+                          updateStatus(chatStatus, `AI正在分析...已收到${wordCount}个字符`, true);
+                        } else if (parsed.error) {
+                          updateStatus(chatStatus, `错误: ${parsed.error}`);
+                          announceMessage(`处理图片时出错: ${parsed.error}`);
+                        }
+                      } catch (err) {
+                        console.error('解析响应错误:', err);
+                      }
+                    }
+                  });
+                  
+                  readStream();
+                }).catch(err => {
+                  console.error('读取流错误:', err);
+                  updateStatus(chatStatus, '处理图片时出错');
+                  announceMessage('处理图片时出错，请重试');
+                  
+                  // 尝试显示已收到的部分响应
+                  if (completeResponse.trim()) {
+                    addMessage('AI', completeResponse);
+                  }
+                });
+              }
+              
+              readStream();
+            })
+            .catch(error => {
+              console.error('上传图片错误:', error);
+              updateStatus(chatStatus, '上传图片失败: ' + error.message);
+              announceMessage('上传图片失败，请重试');
+            });
+          };
+          
+          img.src = e.target.result;
+        };
+        
+        reader.readAsDataURL(file);
+      }
+
+      // 拖放区域事件处理
+      const dropZone = document.getElementById('dropZone');
+      
+      // 点击拖放区域触发文件选择
+      dropZone.addEventListener('click', () => {
+        imageFileInput.click();
+      });
+      
+      // 阻止默认拖放行为
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+        document.body.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+      });
+      
+      // 拖放区域视觉反馈
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.style.borderColor = '#45a049';
+          dropZone.style.backgroundColor = '#e8f4e9';
+        }, false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.style.borderColor = '#3498db';
+          dropZone.style.backgroundColor = '#f8f9fa';
+        }, false);
+      });
+      
+      // 处理拖放的文件
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+          imageFileInput.files = files;
+          announceMessage('已接收拖放的图片');
+          processImageFile(files[0]);
+        }
+      }, false);
+      
+      // 剪贴板粘贴功能
+      document.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+              announceMessage('已从剪贴板获取图片');
+              displayImageInVideoArea(e.target.result);
+              // 创建一个新的文件对象并分析
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(blob);
+              imageFileInput.files = dataTransfer.files;
+              processImageFile(blob);
+            };
+            
+            reader.readAsDataURL(blob);
+            break;
+          }
+        }
+      });
+      
+      // 更新事件监听器
       uploadImageButton.addEventListener('click', () => {
+        const file = imageFileInput.files[0];
+        processImageFile(file);
+      });
+
+      showInVideoButton.addEventListener('click', () => {
         const file = imageFileInput.files[0];
         if (!file) {
           announceMessage('请先选择图片文件');
           return;
         }
         
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const imageData = e.target.result.split(',')[1];
-          const message = messageInput.value.trim();
-          
-          fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              imageData: imageData,
-              message: message || '请描述画面中的重要信息'
-            })
-          })
-          .then(response => {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            
-            function readStream() {
-              reader.read().then(({ done, value }) => {
-                if (done) {
-                  return;
-                }
-                
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n\n');
-                buffer = lines.pop() || '';
-                
-                let fullResponse = '';
-                
-                lines.forEach(line => {
-                  if (line.startsWith('data: ')) {
-                    const data = line.slice(6);
-                    if (data === '[DONE]') {
-                      return;
-                    }
-                    
-                    try {
-                      const parsed = JSON.parse(data);
-                      if (parsed.text) {
-                        fullResponse += parsed.text;
-                        addMessage('AI', fullResponse, true);
-                      }
-                    } catch (err) {
-                      console.error('解析响应错误:', err);
-                    }
-                  }
-                });
-                
-                readStream();
-              }).catch(err => {
-                console.error('读取流错误:', err);
-                chatStatus.textContent = '处理图片时出错';
-                announceMessage('处理图片时出错，请重试');
-              });
-            }
-            
-            readStream();
-          })
-          .catch(error => {
-            console.error('上传图片错误:', error);
-            chatStatus.textContent = '上传图片失败: ' + error.message;
-            announceMessage('上传图片失败，请重试');
-          });
-          
-          announceMessage('正在分析上传的图片，请稍候');
-        };
-        
-        reader.readAsDataURL(file);
+        processImageFile(file, true);
+      });
+
+      clearImageButton.addEventListener('click', () => {
+        clearVideoAreaImage();
       });
       
+      // 文件输入变化事件
+      imageFileInput.addEventListener('change', () => {
+        if (imageFileInput.files.length > 0) {
+          announceMessage('已选择图片: ' + imageFileInput.files[0].name);
+        }
+      });
+
+      // 截取当前摄像头画面
+      function captureCurrentFrame() {
+        // 确保摄像头已打开
+        if (!isCapturing || !stream || !stream.active) {
+          announceMessage('摄像头未开启，无法截图');
+          return null;
+        }
+        
+        try {
+          // 确保canvas尺寸与视频一致
+          canvas.width = videoElement.videoWidth;
+          canvas.height = videoElement.videoHeight;
+          const ctx = canvas.getContext('2d');
+          
+          // 清除之前的内容
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          // 绘制当前视频帧
+          ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+          
+          // 获取图像
+          const imageData = canvas.toDataURL('image/jpeg', 0.7);
+          return imageData;
+        } catch (error) {
+          console.error('截图失败:', error);
+          announceMessage('截图失败: ' + error.message);
+          return null;
+        }
+      }
+
+      // 更新分析当前图片的完整响应处理
+      analyzeCurrentImageButton.addEventListener('click', () => {
+        // 判断是使用上传图片还是当前摄像头画面
+        let imageToAnalyze = null;
+        
+        if (isUsingUploadedImage && lastUploadedImage) {
+          // 使用上传显示的图片
+          imageToAnalyze = lastUploadedImage;
+        } else if (document.getElementById('previewImage').style.display === 'block') {
+          // 使用预览图
+          imageToAnalyze = document.getElementById('previewImage').src;
+        } else {
+          // 尝试捕获当前摄像头画面
+          imageToAnalyze = captureCurrentFrame();
+        }
+        
+        if (!imageToAnalyze) {
+          announceMessage('没有可分析的图片，请先上传图片或开启摄像头');
+          return;
+        }
+        
+        updateStatus(chatStatus, "正在分析当前图片...", true);
+        announceMessage('正在分析图片，请稍候');
+        
+        // 确保imageToAnalyze是base64格式
+        let base64Data = imageToAnalyze;
+        if (base64Data.startsWith('data:image')) {
+          base64Data = base64Data.split(',')[1];
+        }
+        
+        const message = messageInput.value.trim();
+        
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            imageData: base64Data,
+            message: message || '请描述画面中的重要信息'
+          })
+        })
+        .then(response => {
+          updateStatus(chatStatus, "AI正在分析...", true);
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let completeResponse = '';
+          
+          function readStream() {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                updateStatus(chatStatus, "分析完成");
+                
+                // 在结束时显示和朗读完整的响应
+                if (completeResponse.trim()) {
+                  addMessage('AI', completeResponse);
+                }
+                return;
+              }
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+              
+              lines.forEach(line => {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6);
+                  if (data === '[DONE]') {
+                    updateStatus(chatStatus, "分析完成");
+                    return;
+                  }
+                  
+                  try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.text) {
+                      // 累积完整响应，但不立即显示
+                      completeResponse += parsed.text;
+                      // 更新状态以显示进度
+                      const wordCount = completeResponse.length;
+                      updateStatus(chatStatus, `AI正在分析...已收到${wordCount}个字符`, true);
+                    } else if (parsed.error) {
+                      updateStatus(chatStatus, `错误: ${parsed.error}`);
+                      announceMessage(`处理图片时出错: ${parsed.error}`);
+                    }
+                  } catch (err) {
+                    console.error('解析响应错误:', err);
+                  }
+                }
+              });
+              
+              readStream();
+            }).catch(err => {
+              console.error('读取流错误:', err);
+              updateStatus(chatStatus, '处理图片时出错');
+              announceMessage('处理图片时出错，请重试');
+              
+              // 尝试显示已收到的部分响应
+              if (completeResponse.trim()) {
+                addMessage('AI', completeResponse);
+              }
+            });
+          }
+          
+          readStream();
+        })
+        .catch(error => {
+          console.error('分析图片错误:', error);
+          updateStatus(chatStatus, '分析图片失败: ' + error.message);
+          announceMessage('分析图片失败，请重试');
+        });
+      });
+
+      // 截图按钮事件处理
+      captureScreenshotButton.addEventListener('click', () => {
+        const capturedImage = captureCurrentFrame();
+        
+        if (capturedImage) {
+          // 保存截图并显示
+          lastUploadedImage = capturedImage;
+          displayImageInVideoArea(capturedImage);
+          announceMessage('已截取当前画面，可以点击分析按钮进行分析');
+        }
+      });
+
       imageFileInput.addEventListener('change', () => {
         const file = imageFileInput.files[0];
         if (file) {
