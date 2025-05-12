@@ -12,7 +12,7 @@ import sharp from 'sharp'; // 添加sharp库用于图像处理
 dotenv.config();
 
 // API配置
-const API_KEY = 'sk-rvgkaxqeyvhulcciizkmavnexduidivmbhwgroohpjfeaegn';
+const API_KEY = '';
 const MODEL = 'Pro/Qwen/Qwen2.5-VL-7B-Instruct'; // 使用轻量级7B模型
 
 // 图像配置
